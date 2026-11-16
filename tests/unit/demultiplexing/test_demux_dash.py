@@ -1,3 +1,5 @@
+from collections import Counter
+
 import pytest
 import pandas as pd
 
@@ -9,6 +11,7 @@ from workflow.scripts.demultiplexing.demux_dash import (
     calculate_hashing_summary_filtered,
     parse_summary_metrics,
     resolve_solo_feature_paths,
+    write_cell_hashing_table,
 )
 
 
@@ -275,3 +278,39 @@ def test_build_umap_payload_collects_sample_payloads(tmp_path):
     ]
     assert set(payload["samples"]) == {"sample_a", "sample_b"}
     assert payload["samples"]["sample_a"]["feature"] == "Gene"
+
+
+def test_write_cell_hashing_table_writes_reads_per_umi(tmp_path):
+    cell_barcode = "A" * 10 + "C" * 10 + "G" * 10 + "T" * 10
+    qc = {
+        "experiment_name": "exp",
+        "hashing": {
+            "sample_1": {
+                "H1": {
+                    "n_correct": 9,
+                    "n_corrected": 1,
+                    "n_correct_upstream": 0,
+                    "counts": {
+                        cell_barcode: {
+                            "umi": Counter({"AAAAAAAA": 8, "CCCCCCCC": 2}),
+                            "umi_rescued": Counter({"CCCCCCCC": 1}),
+                            "count": 10,
+                            "cell_barcode_label": "A01_A01_LIG1_P01-A01",
+                        }
+                    },
+                }
+            }
+        },
+    }
+    out = tmp_path / "hashing" / "exp_hashing_metrics.tsv"
+
+    write_cell_hashing_table(qc, str(out))
+
+    df_metrics = pd.read_csv(out, sep="\t")
+    assert df_metrics[["count", "n_umi"]].values.tolist() == [[10, 2]]
+
+    df_umi = pd.read_csv(tmp_path / "hashing" / "exp_hashing_umi_counts.tsv.gz", sep="\t")
+    assert list(df_umi.columns) == ["experiment_name", "sample_name", "hashing_name", "cell_barcode", "umi", "reads", "reads_rescued"]
+    assert df_umi["cell_barcode"].unique().tolist() == ["AAAAAAAAAA_CCCCCCCCCC_GGGGGGGGGG_TTTTTTTTTT"]
+    assert df_umi[["umi", "reads", "reads_rescued"]].values.tolist() == [["AAAAAAAA", 8, 0], ["CCCCCCCC", 2, 1]]
+    assert df_umi["reads"].sum() == df_metrics["count"].sum()

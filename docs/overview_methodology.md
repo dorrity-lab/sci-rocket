@@ -91,6 +91,13 @@ These metrics are used to determine the hashing efficiency and to correct for UM
 - count: Total number of hashing reads for that specific cell-barcode / hash-barcode combination.
 - n_umi: Number of unique UMIs for that specific cell-barcode / hash-barcode combination.
 
+In addition, the number of reads supporting each UMI is written to `{experiment_name}_hashing_umi_counts.tsv.gz` (next to the hashing metrics), with one row per cell-barcode / hash-barcode / UMI:
+
+- reads: Number of hashing reads for that UMI (summed over a cell-barcode / hash-barcode combination, this equals count; the number of rows equals n_umi).
+- reads_rescued: Of those reads, how many had their hashing barcode rescued (hamming distance=1 or found upstream) instead of matched exactly.
+
+This allows downstream filtering on read-support per UMI, e.g. to remove low-support UMIs arising from PCR chimeras or barcode/UMI errors in deeply sequenced hashing libraries.
+
 ## Haplotyping (optional; _Mus musculus_ cross-experiments only)
 
 As optional procedure, **sci-rocket** can be used to further haplotype the sex-chromosome X of the demultiplexed samples, e.g. in the case of mouse F1 cross-hybrids, see [here](overview_files.md#haplotyping-optional-mus-musculus-cross-experiments-only) for more information.

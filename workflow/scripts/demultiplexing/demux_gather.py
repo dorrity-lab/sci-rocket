@@ -38,7 +38,9 @@ def combine_pickle(pickle_dict, combined_dict):
                             if cellular_sequence not in combined_dict["hashing"][sample_name][hashing_name]["counts"]:
                                 combined_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence] = pickle_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]
                             else:
+                                # Counter.update() sums the reads per UMI across chunks.
                                 combined_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]["umi"].update(pickle_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]["umi"])
+                                combined_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]["umi_rescued"].update(pickle_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]["umi_rescued"])
                                 combined_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]["count"] += pickle_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]["count"]
                                 if "cell_barcode_label" not in combined_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]:
                                     if "cell_barcode_label" in pickle_dict["hashing"][sample_name][hashing_name]["counts"][cellular_sequence]:

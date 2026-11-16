@@ -360,6 +360,10 @@ def write_cell_hashing_table(qc, out):
         - Total no. of hash reads.
         - Total no. of distinct UMI  per hashing barcode.
 
+    Also writes {experiment_name}_hashing_umi_counts.tsv.gz next to it, with the no. of reads
+    per distinct UMI per cell / hashing barcode (and how many of those reads had a rescued
+    instead of an exactly matched hashing barcode), for read-support filtering downstream.
+
     Parameters:
         qc (dict): Dictionary containing the QC, incl. hashing metrics.
         out (str): Path to output hashing metrics.
@@ -373,6 +377,7 @@ def write_cell_hashing_table(qc, out):
 
     # Create a list of dictionaries.
     array_hashing = []
+    array_umi = []
     
     def format_cell_barcode(cellular_barcode: str) -> str:
         # Cellular barcodes are stored internally as a 40nt concatenation:
@@ -394,17 +399,20 @@ def write_cell_hashing_table(qc, out):
         for hashing_name in qc["hashing"][sample_name]:
             for cellular_barcode in qc["hashing"][sample_name][hashing_name]["counts"]:
                 cell_metrics = qc["hashing"][sample_name][hashing_name]["counts"][cellular_barcode]
+                cell_barcode = format_cell_barcode(cellular_barcode)
                 array_hashing.append(
                     {
                         "experiment_name": qc["experiment_name"],
                         "sample_name": sample_name,
                         "hashing_name": hashing_name,
-                        "cell_barcode": format_cell_barcode(cellular_barcode),
+                        "cell_barcode": cell_barcode,
                         "cell_barcode_label": cell_metrics.get("cell_barcode_label", ""),
                         "count": cell_metrics["count"],
                         "n_umi": len(cell_metrics["umi"])
                     }
                 )
+                for umi, reads in cell_metrics["umi"].items():
+                    array_umi.append((sample_name, hashing_name, cell_barcode, umi, reads, cell_metrics["umi_rescued"][umi]))
 
     # Convert to pandas dataframe.
     df_hashing = pd.DataFrame(columns=["experiment_name", "sample_name", "hashing_name", "cell_barcode", "cell_barcode_label", "count", "n_umi"], data=array_hashing)
@@ -418,6 +426,13 @@ def write_cell_hashing_table(qc, out):
 
     # Write to file.
     df_hashing.to_csv(out, sep="\t", index=False, header=True, encoding="utf-8", mode="w")
+
+    # Write the reads per UMI (one row per cell / hashing barcode / UMI).
+    df_umi = pd.DataFrame(columns=["sample_name", "hashing_name", "cell_barcode", "umi", "reads", "reads_rescued"], data=array_umi)
+    df_umi.insert(0, "experiment_name", qc["experiment_name"])
+    df_umi = df_umi.sort_values(by=["cell_barcode", "hashing_name", "umi"])
+    out_umi = os.path.join(os.path.dirname(out), f"{qc['experiment_name']}_hashing_umi_counts.tsv.gz")
+    df_umi.to_csv(out_umi, sep="\t", index=False, header=True, encoding="utf-8", mode="w")
 
     # Build sample-level summary statistics used in an extra dashboard table.
     hashing_summary = calculate_hashing_summary(df_hashing, sample_names=list(qc["hashing"].keys()))
